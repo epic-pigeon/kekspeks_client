@@ -213,6 +213,16 @@ export default class Main extends React.Component {
                                     }}
                                 >Create</Button>
                             </div>
+                            <Button
+                                variant="contained"
+                                onClick={e => API.downloadKeys()}
+                                style={{margin: "10px"}}
+                            >Download keys</Button>
+                            <Button
+                                variant="contained"
+                                onClick={e => API.logout().then(e => window.location = "/login")}
+                                style={{margin: "10px"}}
+                            >Log out</Button>
                         </>
                         : "Loading..."
                 }</div>
