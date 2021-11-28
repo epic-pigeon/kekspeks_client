@@ -648,38 +648,42 @@ export default class API {
     }
     static pollEventEmitter() {
         let eventEmitter = new EventEmitter();
-        new Promise(async () => {
-            while (true) {
-                let r, e, start = Date.now();
-                try {
-                    r = await API._authRequest({
-                        method: "POST",
-                        endpoint: "/api/poll",
-                        params: {}
-                    }, false);
-                } catch (err) {
-                    e = err
-                }
-                if (r && r.ok) {
-                    let ev = await r.json();
-                    if (ev.type === "message") {
-                        let messageKey = (await API.getKeys()).groups[ev.groupId].key;
-                        await API.processMessage(ev.message, messageKey);
+        new Promise(async (resolve, reject) => {
+            try {
+                while (true) {
+                    let r, e, start = Date.now();
+                    try {
+                        r = await API._authRequest({
+                            method: "POST",
+                            endpoint: "/api/poll",
+                            params: {}
+                        }, false);
+                    } catch (err) {
+                        e = err
                     }
-                    eventEmitter.emit(ev.type, ev);
-                } else {
-                    if (r) {
-                        let text = await r.text();
-                        if (r.status === 408 && text === "Poll timeout") {
-                            continue;
+                    if (r && r.ok) {
+                        let ev = await r.json();
+                        if (ev.type === "message") {
+                            let messageKey = (await API.getKeys()).groups[ev.groupId].key;
+                            await API.processMessage(ev.message, messageKey);
                         }
-                        throw new Error(text);
+                        eventEmitter.emit(ev.type, ev);
                     } else {
-                        if (start + 30_000 > Date.now()) throw e;
+                        if (r) {
+                            let text = await r.text();
+                            if (r.status === 408 && text === "Poll timeout") {
+                                continue;
+                            }
+                            throw new Error(text);
+                        } else {
+                            if (start + 30_000 > Date.now()) throw e;
+                        }
                     }
                 }
+            } catch (e) {
+                reject(e);
             }
-        });
+        }).catch(e => eventEmitter.emit('error', e));
         return eventEmitter;
     }
 }

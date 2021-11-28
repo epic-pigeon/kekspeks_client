@@ -16,6 +16,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CheckIcon from '@mui/icons-material/Check';
 import {IconButton} from "@mui/material";
+import Snackbar from "@mui/material/Snackbar";
 
 export default class Main extends React.Component {
     constructor(props) {
@@ -31,22 +32,7 @@ export default class Main extends React.Component {
         API.getInvitations(0, 5).then(invites => {
             this.setState({invites});
         }).catch(e => this.errorDialog.current && this.errorDialog.current.displayError(e));
-        API.pollEventEmitter().on("message", m => {
-            if (this.state.messages && this.state.messages[m.groupId] && m.message.fromLogin !== this.state.me.login) {
-                this.setState({
-                    messages: {
-                        ...this.state.messages,
-                        [m.groupId]: [m.message, ...this.state.messages[m.groupId]]
-                    },
-                }, () => {
-                    this.messageList.current.scrollTop = this.messageList.current.scrollHeight;
-                });
-            }
-        }).on('invitation', ev => {
-            this.setState({
-                invites: [ev.invitation, ...this.state.invites]
-            })
-        });
+        this.createEventEmitter();
         this.state = {
             me: undefined,
             groups: undefined,
@@ -59,10 +45,56 @@ export default class Main extends React.Component {
             inviteLogin: "",
             inviteButtonDisabled: false,
             invites: [],
+            snackBarOpen: false,
+            snackBarText: '?',
         };
         this.errorDialog = React.createRef();
         this.infoDialog = React.createRef();
         this.messageList = React.createRef();
+    }
+    async createEventEmitter() {
+        let timeout = 20;
+        while (true) {
+            let e = await new Promise(resolve => {
+                API.pollEventEmitter().on("message", m => {
+                    if (this.state.messages && this.state.messages[m.groupId] && m.message.fromLogin !== this.state.me.login) {
+                        this.setState({
+                            messages: {
+                                ...this.state.messages,
+                                [m.groupId]: [m.message, ...this.state.messages[m.groupId]]
+                            },
+                        }, () => {
+                            this.messageList.current.scrollTop = this.messageList.current.scrollHeight;
+                        });
+                    }
+                }).on('invitation', ev => {
+                    this.setState({
+                        invites: [ev.invitation, ...this.state.invites]
+                    })
+                }).on('error', e => resolve(e));
+            });
+            let c = 0;
+            this.setState({
+                snackBarOpen: true,
+                snackBarText: "Retrying connection in " + timeout,
+            });
+            await new Promise(resolve => {
+                let id = setInterval(() => {
+                    if (c >= timeout) {
+                        clearInterval(id);
+                        resolve();
+                        return;
+                    }
+                    c++;
+                    this.setState({
+                        snackBarText: "Retrying connection in " + (timeout - c),
+                    });
+                }, 1000);
+            });
+            this.setState({
+                snackBarOpen: false,
+            });
+        }
     }
     groupMembersString(g) {
         let res = g.ownerLogin + " (owner)";
@@ -116,6 +148,7 @@ export default class Main extends React.Component {
         return <>
             <ErrorDialog ref={this.errorDialog}/>
             <InfoDialog ref={this.infoDialog}/>
+            <Snackbar open={this.state.snackBarOpen} message={this.state.snackBarText}/>
             <div style={{width: "100vw", height: "100vh", display: "flex"}}>
                 <div style={{width: "40vw", borderRight: "1px solid grey", overflowY: "scroll"}}>{
                     this.state.invites && this.state.invites.length > 0 &&
