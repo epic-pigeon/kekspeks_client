@@ -42,6 +42,10 @@ export default class Main extends React.Component {
                     this.messageList.current.scrollTop = this.messageList.current.scrollHeight;
                 });
             }
+        }).on('invitation', ev => {
+            this.setState({
+                invites: [ev.invitation, ...this.state.invites]
+            })
         });
         this.state = {
             me: undefined,
